@@ -1,6 +1,6 @@
 min:
 	mkdir -p build
-	r.js -o baseUrl=src name=almond include=main insertRequire=main out=build/main.js wrap=true
+	r.js -o baseUrl=src name=almond include=main insertRequire=main out=build/main.js wrap=true optimize=none
 	sed 's/lib\/require\.js/main.js/g' index.html| sed 's/data-main=src\/main/ /g' > build/index.html
 	cp -r *.png *.jpg *.css shaders build
 

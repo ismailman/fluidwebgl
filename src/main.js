@@ -1,6 +1,6 @@
 define(function(require, exports, module){
 require('game-shim');
-require('dat.gui');
+//require('dat.gui');
 // only when optimized
 
 var Loader = require('engine/loader'),
@@ -16,6 +16,14 @@ var Loader = require('engine/loader'),
     ComputeKernel = require('compute').Kernel,
     vec2 = glm.vec2;
 
+var Keys = [
+    ["À", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "½", "»", "BACKSPACE"],
+    ["TAB", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "Û", "Ý", "Ü"],
+    ["CAPS_LOCK", "A", "S", "D", "F", "G", "H", "J", "K", "L", "º", "Þ", "ENTER"],
+    ["SHIFT", "Z", "X", "C", "V", "B", "N", "M", "¼", "¾", "¿"],
+    ["CTRL", "ALT", "[", "SPACE", "]", "LEFT", "UP", "DOWN", "RIGHT"]
+];
+
 var canvas = document.getElementById('c'),
     gl = glcontext.initialize(canvas, {
         context: {
@@ -28,13 +36,13 @@ var canvas = document.getElementById('c'),
         }
     }, fail),
     options = {
-        iterations: 32,
-        mouse_force: 1,
-        resolution: 0.5,
-        cursor_size: 100,
+        iterations: 4,
+        mouse_force: 0.75,
+        resolution: 0.25,
+        cursor_size: 50,
         step: 1/60
     },
-    gui = new dat.GUI(),
+    //gui = new dat.GUI(),
     clock = new Clock(canvas),
     input = new InputHandler(canvas),
     loader = new Loader(),
@@ -67,18 +75,18 @@ function init(){
             setup(width, height, format);
         //}
     }, 250));
-    gui.add(options, 'iterations', 2, 128).step(2);
+    /*gui.add(options, 'iterations', 2, 128).step(2);
     gui.add(options, 'mouse_force', 1, 100).step(1);
     gui.add(options, 'cursor_size', 8, 1000).step(1).onFinishChange(onresize);
     gui.add(options, 'resolution', {'quarter': 0.25, 'half': 0.5, full: 1.0, double: 2.0, quadruple: 4.0}).onFinishChange(onresize);
     gui.add(options, 'step', {'1/1024': 1/1024, '1/240': 1/240, '1/120': 1/120, '1/60': 1/60, '1/30': 1/30, '1/10': 1/10});
-    gui.close();
+    gui.close(); */
     onresize();
     clock.start();
 }
 
 function setup(width, height, singleComponentFboFormat){
-    canvas.width = width,
+    canvas.width = width;
     canvas.height = height;
 
     gl.viewport(0, 0, width, height);
@@ -268,25 +276,50 @@ function setup(width, height, singleComponentFboFormat){
             output: null
         });
 
-    var x0 = input.mouse.x,
-        y0 = input.mouse.y;
+    var x0 = input.mouse.x;
+    var y0 = input.mouse.y;
 
     clock.ontick = function(dt){
-        var x1 = input.mouse.x * options.resolution,
-            y1 = input.mouse.y * options.resolution,
-            xd = x1-x0,
+        var x1 = input.mouse.x * options.resolution;
+            y1 = input.mouse.y * options.resolution;
+
+        var xd = x1-x0,
             yd = y1-y0;
 
-        x0 = x1,
+        x0 = x1;
         y0 = y1;
         if(x0 === 0 && y0 === 0) xd = yd = 0;
         advectVelocityKernel.uniforms.dt = options.step*1.0;
         advectVelocityKernel.run();
 
+        for(var key in input.keys){
+            if(!input.keys[key]){
+                continue;
+            }
+
+            var yIndex = 0;
+            var xIndex;
+            for(; yIndex<Keys.length; yIndex++){
+                xIndex = Keys[yIndex].indexOf(key);
+                if(xIndex > -1){
+                    break;
+                }
+            }
+
+            var kx = width/Keys[yIndex].length * xIndex;
+            var ky = height/Keys.length * yIndex;
+
+            vec2.set([1*px_x*options.cursor_size*options.mouse_force,
+                 -1*px_y*options.cursor_size*options.mouse_force], addForceKernel.uniforms.force);
+            vec2.set([kx*px_x*2-1.0, ((50+ky)*px_y*2-1.0)*-1], addForceKernel.uniforms.center);
+
+            addForceKernel.run();
+        }
 
         vec2.set([xd*px_x*options.cursor_size*options.mouse_force,
                  -yd*px_y*options.cursor_size*options.mouse_force], addForceKernel.uniforms.force);
         vec2.set([x0*px_x*2-1.0, (y0*px_y*2-1.0)*-1], addForceKernel.uniforms.center);
+
         addForceKernel.run();
 
         velocityBoundaryKernel.run();
@@ -325,6 +358,8 @@ loader.load([
             'shaders/cursor.vertex',
             'shaders/boundary.vertex',
             'shaders/kernel.vertex'
-], init); 
+], init);
 
 });
+
+document.addEventListener('keydown', function(e){e.preventDefault();}, true);
